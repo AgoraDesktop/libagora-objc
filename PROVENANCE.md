@@ -12,7 +12,34 @@ linked against.
 | Upstream commit date | 2025-09-16 |
 | Extraction | the upstream repository root, placed at this repository's root |
 | Extraction date | 2026-10-10 |
-| Source changes by Agora | none |
+| Source changes by Agora | **one file**: `arc.mm` — `object_getRetainCount_np` on a small object. See below. |
+
+## Agora's changes
+
+**One, and it is a crash fix in `arc.mm`.**
+
+`object_getRetainCount_np` read the reference count out of the word BEFORE the object without first
+settling the cases where there is no such word. Every other door that reads that word asks first:
+`retain()` and `release()` go through `isPersistentObject()`, which answers YES for nil, for a SMALL
+OBJECT and for an instance of a class marked permanent. The small-object case is the one that bites,
+because a small object is a TAGGED POINTER — there is no `isa` to read at all, and reading offset 0 of
+one dereferences the tag bits as an address.
+
+MEASURED: `[@"a string literal" retainCount]` SEGFAULTED while `[@"a string literal" retain]`,
+`… release]`, `… autorelease]`, `… length]` and `… UTF8String]` were all fine — every one of those
+settles the small-object case first, and this door was the only one that went straight for the header.
+The literal is a tagged pointer whose class is `NSTinyString`.
+
+The fix asks `isPersistentObject()` and then the fast-ARC flag, exactly as `retain()` and `release()`
+do, and answers the SATURATED count (`refcount_max`) when neither applies. That is what "this object is
+never released" means, and it is Apple's own reading of `retainCount` for a constant string: a very
+large number rather than a real count.
+
+It is held by `libagora-base/tests/bridges.m`, in the `reg_tagged` case. That suite is where the two
+libraries are tested together, and that case had ALREADY recorded this same finding for the bridge's
+own door — "Reading offset 0 of one dereferences 0xd19766cde000002c" — so the runtime's door belongs
+beside it. Upstream's own suite under `Test/` would be the other home for it and is NOT wired into
+this workspace's test run: it sits behind the `TESTS` CMake option, off by default.
 
 ## What was copied
 

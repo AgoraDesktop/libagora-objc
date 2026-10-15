@@ -250,8 +250,30 @@ static const size_t weak_mask = ((size_t)1)<<((sizeof(size_t)*8)-refcount_shift)
 static const size_t refcount_mask = ~weak_mask;
 static const size_t refcount_max = refcount_mask - 1;
 
+// AGORA: an object this runtime does not count has no header word to read, and the word
+// before it belongs to whatever happens to be in memory there. isPersistentObject() is
+// where that rule already lives — nil, a SMALL OBJECT, and an instance of a class marked
+// permanent all have no reference count here — and the small-object case is why the check
+// has to come BEFORE any dereference: a small object is a TAGGED POINTER, so there is no
+// isa to read at all. The fast-ARC flag is the other half of it: a class that overrides
+// retain without _ARCCompliantRetainRelease has that flag cleared (dtable.c), and this
+// runtime keeps no count for its instances either.
+//
+// MEASURED: [@"a string literal" retainCount] segfaulted while retain and release on the
+// SAME literal were fine. The literal is a tagged pointer whose class is NSTinyString, and
+// retain/release never dereferenced it because isPersistentObject answers YES for small
+// objects — this door was the only one that went straight for the header. A saturated
+// count is what "this object is never released" answers, which is Apple's own reading of
+// retainCount for a constant string.
+static inline BOOL isPersistentObject(id obj);
+
 extern "C" OBJC_PUBLIC size_t object_getRetainCount_np(id obj)
 {
+	if (isPersistentObject(obj) ||
+	    !objc_test_class_flag(classForObject(obj), objc_class_flag_fast_arc))
+	{
+		return refcount_max;
+	}
 	uintptr_t *refCount = ((uintptr_t*)obj) - 1;
 	uintptr_t refCountVal = __sync_fetch_and_add(refCount, 0);
 	size_t realCount = refCountVal & refcount_mask;
