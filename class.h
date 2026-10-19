@@ -464,6 +464,20 @@ void freeMethodLists(Class aClass);
 
 void objc_load_class(struct objc_class *cls);
 
+/**
+ * Registers a class that was emitted by a compiler but instantiated at runtime
+ * (Swift instantiates generic class metadata lazily, from a pattern, so such a
+ * class cannot appear in an `.objc_init` class list), and makes it dispatchable.
+ *
+ * `objc_load_class()` alone installs the `uninstalled_dtable` sentinel but
+ * leaves the dispatch tables empty; `objc_registerClassPair()` does not even
+ * install the sentinel, so a send to such a class walks a null table.  This is
+ * the supported entry point for that case: it loads the class and then forces
+ * class initialization, which builds the dispatch tables from the class's
+ * method lists.
+ */
+OBJC_PUBLIC void objc_loadClass_np(Class cls);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

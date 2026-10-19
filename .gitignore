@@ -14,3 +14,6 @@
 .DS_Store
 *.swp
 *~
+
+# A second build tree used while comparing runtime layouts
+/build-fresh/

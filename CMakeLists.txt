@@ -30,7 +30,11 @@ INCLUDE (CheckCXXSourceCompiles)
 INCLUDE (FetchContent)
 INCLUDE (CheckSymbolExists)
 
-set(libobjc_VERSION 4.6)
+# SONAME is libobjc.so.4 (not 4.6) so the toolchain's libswiftCore, which links
+# the conventional name libobjc.so.4, resolves to THIS runtime rather than a
+# system libobjc.so.4. Two ObjC runtimes in one process deadlock during
+# init_runtime, because each interposes the other's class_getSuperclass.
+set(libobjc_VERSION 4)
 
 
 if (MSVC)

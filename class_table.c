@@ -404,6 +404,23 @@ static void reload_class(struct objc_class *class, struct objc_class *old)
 	}
 }
 
+// Defined in dtable.c.
+OBJC_PUBLIC void objc_send_initialize(id object);
+
+OBJC_PUBLIC void objc_loadClass_np(Class cls)
+{
+	{
+		// objc_load_class() assumes the runtime lock is held (it inserts into the
+		// class table). objc_send_initialize() takes the lock itself, so it must
+		// run outside this scope.
+		LOCK_RUNTIME_FOR_SCOPE();
+		objc_load_class(cls);
+	}
+	// Installs the dispatch tables from the class's method lists.  Without this
+	// the class keeps the `uninstalled_dtable` sentinel and every send misses.
+	objc_send_initialize((id)cls);
+}
+
 /**
  * Loads a class.  This function assumes that the runtime mutex is locked.
  */
