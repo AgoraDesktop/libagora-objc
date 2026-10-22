@@ -592,13 +592,19 @@ PRIVATE dtable_t create_dtable_for_class(Class class, dtable_t root_dtable)
 		super_dtable = dtable_for_class(super);
 		if (super_dtable == uninstalled_dtable)
 		{
-			if (super->isa == class)
+			if (super->isa == class || super == class)
 			{
 				super_dtable = root_dtable;
 			}
 			else
 			{
-				abort();
+				// The superclass has not been messaged yet.  A class can be
+				// messaged before its superclass is -- a `Protocol` object's
+				// class roots at the legacy `Object` class, which nothing else
+				// messages -- so build the superclass's table now.  The lock is
+				// recursive and the recursion ends at a root class, whose
+				// superclass is nil.
+				super_dtable = create_dtable_for_class(super, root_dtable);
 			}
 		}
 		dtable = SparseArrayCopy(super_dtable);
