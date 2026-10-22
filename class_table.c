@@ -15,6 +15,14 @@
 void objc_init_protocols(struct objc_protocol_list *protos);
 void objc_compute_ivar_offsets(Class class);
 
+/*
+ * Provided by the Swift runtime when it is linked into the image.  A Swift
+ * class in the GNUstep layout keeps its instance size in two words: the
+ * GNUstep `instance_size` that objc_compute_ivar_offsets() just computed and
+ * Swift's own `InstanceSize`, which the first one hides.  Swift mirrors it.
+ */
+extern void swift_objcClassLayoutDidChange(Class) __attribute__((weak));
+
 ////////////////////////////////////////////////////////////////////////////////
 // +load method hash table
 ////////////////////////////////////////////////////////////////////////////////
@@ -261,6 +269,16 @@ PRIVATE BOOL objc_resolve_class(Class cls)
 
 	// Fix up the ivar offsets
 	objc_compute_ivar_offsets(cls);
+
+	// A class whose Objective-C superclass had no layout in its header is
+	// emitted late-bound (instance_size 0), and the offsets above are the
+	// runtime's.  Let the Swift runtime mirror the size it just computed into
+	// Swift's own `InstanceSize` word; the hook is absent unless Swift is
+	// linked in.
+	if (swift_objcClassLayoutDidChange)
+	{
+		swift_objcClassLayoutDidChange(cls);
+	}
 #ifdef OLDABI_COMPAT
 	struct objc_class_gsv1 *oldCls = objc_legacy_class_for_class(cls);
 	if (oldCls)
