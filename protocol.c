@@ -164,8 +164,18 @@ static BOOL init_protocols(struct objc_protocol_list *protocols)
 		switch (version)
 		{
 			default:
-				fprintf(stderr, "Unknown protocol version");
+				fprintf(stderr, "Unknown protocol version %ld (%s)\n",
+				        (long)version, aProto->name ? aProto->name : "?");
 				abort();
+			case protocol_version_gsv2:
+				// A v2 record whose image has not been loaded yet.  This
+				// happens when a class's protocol list names a protocol
+				// defined in another image -- a Swift class in libswiftCore
+				// listing a Foundation protocol, for instance.  Initialise the
+				// record in place; unique_protocol() below merges it with the
+				// canonical record if that image has already registered one.
+				aProto->isa = (id)&_OBJC_CLASS_Protocol;
+				break;
 #ifdef OLDABI_COMPAT
 			case protocol_version_gcc:
 				protocols->list[i] = objc_upgrade_protocol_gcc((struct objc_protocol_gcc *)aProto);
@@ -180,9 +190,6 @@ static BOOL init_protocols(struct objc_protocol_list *protocols)
 				aProto = protocols->list[i];
 				break;
 #endif
-			case protocol_version_gsv2:
-				aProto->isa = (id)&_OBJC_CLASS_Protocol;
-				break;
 		}
 		// Initialize all of the protocols that this protocol refers to
 		if (NULL != aProto->protocol_list)

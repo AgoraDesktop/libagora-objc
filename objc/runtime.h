@@ -128,9 +128,25 @@ typedef struct objc_method *Method;
 
 /**
  * Objective-C boolean type.
+ *
+ * With STRICT_APPLE_COMPATIBILITY (the default) this is Apple's definition per
+ * architecture: `bool` on arm64 and `signed char` everywhere else.  The type's
+ * encoding is part of every method signature and libobjc2 keys typed dispatch
+ * on (selector, encoding), so it has to agree with what a Swift `Bool` method
+ * publishes - `c` on x86_64 - or an Objective-C send will miss a Swift
+ * override of a `BOOL` method.  Without the option, GNUstep's historical
+ * `unsigned char` is used, which encodes as `C` and does not agree with Swift.
  */
 #	ifdef STRICT_APPLE_COMPATIBILITY
+#		if defined(__arm64__) || defined(__aarch64__)
+#			ifdef __cplusplus
+typedef bool BOOL;
+#			else
+typedef _Bool BOOL;
+#			endif
+#		else
 typedef signed char BOOL;
+#		endif
 #	else
 #		if defined(__vxworks) || defined(_WIN32)
 typedef  int BOOL;
