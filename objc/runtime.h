@@ -155,6 +155,33 @@ typedef unsigned char BOOL;
 #		endif
 #	endif
 
+/**
+ * The type encoding of `BOOL` above, as the leading character of a method type string.
+ *
+ * A hand-written method table cannot spell `@encode(BOOL)`, so it spells this instead, and it has to
+ * agree with the compiler: libobjc2 keys typed dispatch on (selector, encoding), so a table that
+ * publishes `c` where the compiler publishes `B` gets NO SEND for the selector and the message falls
+ * through to the superclass. That is not hypothetical -- Core Foundation's bridge tables said `c`
+ * for every BOOL-returning door and -[__NSCFURL isFileURL] answered from the base class's uninitialised
+ * ivar on arm64. It is defined HERE, beside the typedef it describes, so the encoding and the type are
+ * chosen together rather than assumed apart.
+ *
+ * Concatenates with the rest of an encoding: `OBJC_BOOL_TYPE_ENCODING "16@0:8"`.
+ */
+#	ifdef STRICT_APPLE_COMPATIBILITY
+#		if defined(__arm64__) || defined(__aarch64__)
+#			define OBJC_BOOL_TYPE_ENCODING "B"
+#		else
+#			define OBJC_BOOL_TYPE_ENCODING "c"
+#		endif
+#	else
+#		if defined(__vxworks) || defined(_WIN32)
+#			define OBJC_BOOL_TYPE_ENCODING "i"
+#		else
+#			define OBJC_BOOL_TYPE_ENCODING "C"
+#		endif
+#	endif
+
 #else
 // Method in the GCC runtime is a struct, Method_t is the pointer
 #	define Method Method_t
